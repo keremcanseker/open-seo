@@ -15,6 +15,7 @@ import {
 } from "@/server/workflows/rankCheckPaths";
 import { pgStep } from "@/server/workflows/pgStep";
 import { createDataforseoClient } from "@/server/lib/dataforseo";
+import { usesTreg } from "@/server/lib/dataforseo/treg";
 import { captureServerEvent } from "@/server/lib/posthog";
 import { AppError } from "@/server/lib/errors";
 import { autumn } from "@/server/billing/autumn";
@@ -360,7 +361,8 @@ export class RankCheckWorkflow extends WorkflowEntrypoint<
         };
         // Scheduled checks use DataForSEO's task queue (~30% of live cost);
         // manual checks stay on the live endpoint for instant results.
-        if (trigger === "scheduled") {
+        // treg has no task_get, so it runs every check live.
+        if (trigger === "scheduled" && !(await usesTreg())) {
           queueStats = await runQueuedCheck(step, checkContext);
         } else {
           await runLiveCheck(step, checkContext);

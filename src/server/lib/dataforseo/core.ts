@@ -1,5 +1,6 @@
 import { AppError } from "@/server/lib/errors";
 import { getRequiredEnvValue } from "@/server/lib/runtime-env";
+import { TREG_KEY_PREFIX, tregCallUrl } from "@/server/lib/dataforseo/treg";
 import type { ErrorCode } from "@/shared/error-codes";
 // Type-only: erased at compile, so no runtime cycle with envelope.ts (which
 // imports DataforseoErrorClassifier from here the same way).
@@ -68,7 +69,13 @@ function createAuthenticatedFetch(
   return async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
     const apiKey = await getRequiredEnvValue("DATAFORSEO_API_KEY");
     const headers = new Headers(init?.headers);
-    headers.set("Authorization", `Basic ${apiKey}`);
+    let target = url;
+    if (apiKey.startsWith(TREG_KEY_PREFIX)) {
+      target = tregCallUrl(typeof url === "string" ? url : url.url);
+      headers.set("X-Treg-Token", apiKey.slice(TREG_KEY_PREFIX.length));
+    } else {
+      headers.set("Authorization", `Basic ${apiKey}`);
+    }
     // Resolve the signal once so retries share the overall request timeout
     // rather than restarting a fresh 60s budget on each attempt.
     const signal =
@@ -77,7 +84,7 @@ function createAuthenticatedFetch(
     for (let attempt = 0; ; attempt++) {
       let response: Response;
       try {
-        response = await fetch(url, { ...init, headers, signal });
+        response = await fetch(target, { ...init, headers, signal });
       } catch (error) {
         // Both abort flavours mean "we ran out of time", and neither carries a
         // useful name of its own: the shared budget above rejects with

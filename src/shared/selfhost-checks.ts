@@ -35,6 +35,8 @@ export function validateTeamDomain(value: string): TeamDomainResult {
 // base64("login:password"). Decoding it and finding a colon is a cheap sanity
 // check that catches the most common paste mistake without a paid API call.
 export function looksLikeDataForSeoKey(value: string): boolean {
+  // A "treg:<token>" key routes DataForSEO calls through treg instead.
+  if (value.trim().startsWith("treg:")) return true;
   try {
     return atob(value.trim()).includes(":");
   } catch {

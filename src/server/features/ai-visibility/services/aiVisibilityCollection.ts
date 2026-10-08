@@ -8,6 +8,7 @@ import {
   type PostedAiTrackingTask,
 } from "@/server/lib/dataforseo";
 import { resolveLatestLlmModelName } from "@/server/lib/dataforseo/llm-models";
+import { usesTreg } from "@/server/lib/dataforseo/treg";
 import { AppError } from "@/server/lib/errors";
 import { isHostedServerAuthMode } from "@/server/lib/runtime-env";
 import { getIsoCountryCode } from "@/shared/keyword-locations";
@@ -75,7 +76,8 @@ export async function prepareAiRun(
   const pending = (await repo.getObservations([runId])).filter(
     (row) => row.status === "pending",
   );
-  const live = run.trigger !== "scheduled";
+  // treg has no task_get, so it collects every run live.
+  const live = run.trigger !== "scheduled" || (await usesTreg());
   if (await isHostedServerAuthMode()) {
     const required = aiCostForAnswers(
       pending.map((row) => row.engine),
