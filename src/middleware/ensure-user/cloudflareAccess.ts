@@ -87,12 +87,34 @@ export async function resolveCloudflareAccessContext(
     throw classifyAccessVerificationError(error);
   }
 
-  const userId = typeof payload.sub === "string" ? payload.sub : null;
-  const userEmail = typeof payload.email === "string" ? payload.email : null;
+  const identity = accessIdentity(payload);
 
-  if (!userId || !userEmail) {
+  if (!identity) {
     throw new AppError("UNAUTHENTICATED");
   }
 
-  return resolveSharedWorkspaceContext(userId, userEmail);
+  return resolveSharedWorkspaceContext(identity.userId, identity.userEmail);
+}
+
+// Service tokens (agents, MCP clients) get a JWT with an empty sub, no email
+// and the token's client id in common_name; they act as their own user in the
+// shared workspace. The Access policy still decides which tokens get in.
+export function accessIdentity(
+  payload: JWTPayload,
+): { userId: string; userEmail: string } | null {
+  if (typeof payload.sub === "string" && payload.sub) {
+    return typeof payload.email === "string" && payload.email
+      ? { userId: payload.sub, userEmail: payload.email }
+      : null;
+  }
+
+  const clientId = payload.common_name;
+  if (typeof clientId === "string" && clientId) {
+    return {
+      userId: `service-token:${clientId}`,
+      userEmail: `${clientId}@service-token.invalid`,
+    };
+  }
+
+  return null;
 }
